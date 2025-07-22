@@ -10,17 +10,22 @@ class TreiberStack<E> : Stack<E> {
         // TODO: Make me linearizable!
         // TODO: Update `top` via Compare-and-Set,
         // TODO: restarting the operation on CAS failure.
-        val curTop = top.get()
-        val newTop = Node(element, curTop)
-        top.set(newTop)
+        var curTop = top.get()
+        var newTop = Node(element, curTop)
+        while (!top.compareAndSet(curTop, newTop)) {
+            curTop = top.get()
+            newTop = Node(element, curTop)
+        }
     }
 
     override fun pop(): E? {
         // TODO: Make me linearizable!
         // TODO: Update `top` via Compare-and-Set,
         // TODO: restarting the operation on CAS failure.
-        val curTop = top.get() ?: return null
-        top.set(curTop.next)
+        var curTop = top.get() ?: return null
+        while (!top.compareAndSet(curTop, curTop.next)) {
+           curTop = top.get() ?: return null
+        }
         return curTop.element
     }
 
