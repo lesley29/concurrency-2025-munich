@@ -18,92 +18,117 @@ import kotlin.coroutines.*
  * (You may also follow `SequentialChannelInt` in tests for the sequential semantics).
  */
 class RendezvousChannel<E : Any> {
-    private val head: AtomicReference<Node>
-    private val tail: AtomicReference<Node>
+    private val head: AtomicReference<Node<E>>
+    private val tail: AtomicReference<Node<E>>
 
     init {
-        val dummy = Node(null, null)
+        val dummy = Dummy<E>()
         head = AtomicReference(dummy)
         tail = AtomicReference(dummy)
     }
 
     suspend fun send(element: E) {
         while (true) {
-            // TODO: feel free to change this code if needed.
-            // Is this queue empty or contain other senders?
-            if (isEmptyOrContainsSenders()) {
-                val success = suspendCoroutine<Boolean> { continuation ->
-                    val node = Node(element, continuation as Continuation<Any?>)
-                    if (!tryAddNode(tail.get(), node)) {
-                        // Fail and retry.
-                        continuation.resume(false)
-                    }
+            firstReceiverOrNull()?.let {
+                it.received.resume(element)
+                return@send
+            }
+
+            val dispatched = suspendCoroutine { dispatched ->
+                val sender = Sender(element, dispatched)
+                if (!tryAddNode(sender)) {
+                    dispatched.resume(false)
                 }
-                // Finish on success and retry on failure.
-                if (success) return
-            } else {
-                // The queue contains receivers, try to extract the first one.
-                val firstReceiver = tryExtractNode(head.get()) ?: continue
-                firstReceiver.continuation!!.resume(element)
-                return
+            }
+
+            if (dispatched) {
+                break
             }
         }
     }
 
     suspend fun receive(): E {
         while (true) {
-            // TODO: feel free to change this code if needed.
-            // Is this queue empty or contain other receivers?
-            if (isEmptyOrContainsReceivers()) {
-                val element = suspendCoroutine<E?> { continuation ->
-                    val node = Node(RECEIVER, continuation as Continuation<Any?>)
-                    if (!tryAddNode(tail.get(), node)) {
-                        // Fail and retry.
-                        continuation.resume(null)
-                    }
+            firstSenderOrNull()?.let {
+                it.dispatched.resume(true)
+                return@receive it.element as E
+            }
+
+            val element = suspendCoroutine { received ->
+                val receiver = Receiver(received)
+                if (!tryAddNode(receiver)) {
+                    received.resume(null)
                 }
-                // Should we retry?
-                if (element == null) continue
-                // Return the element
+            }
+
+            if (element != null) {
                 return element
-            } else {
-                // The queue contains senders, try to extract the first one.
-                val firstSender = tryExtractNode(head.get()) ?: continue
-                firstSender.continuation!!.resume(true)
-                return firstSender.element as E
             }
         }
     }
 
-    private fun isEmptyOrContainsReceivers(): Boolean {
-        TODO(" Implement me!")
-        // For receivers, Node.element === RECEIVER
+    private fun firstReceiverOrNull(): Receiver<E>? {
+        val currentHead = head.get()
+        val first = currentHead.next.get() ?: return null
+        if (first !is Receiver<E>) {
+            return null
+        }
+
+        return if (head.compareAndSet(currentHead, first)) first else null
     }
 
-    private fun isEmptyOrContainsSenders(): Boolean {
-        TODO(" Implement me!")
-        // For senders, Node.element !== RECEIVER
+    private fun firstSenderOrNull(): Sender<E>? {
+        val currentHead = head.get()
+        val first = currentHead.next.get() ?: return null
+        if (first !is Sender<E>) {
+            return null
+        }
+
+        return if (head.compareAndSet(currentHead, first)) first else null
     }
 
-    private fun tryAddNode(curTail: Node, newNode: Node): Boolean {
-        TODO("Implement me!")
-        // TODO: Return `false` if the attempt has failed.
+    private fun tryAddNode(newNode: Node<E>): Boolean {
+        while (true) {
+            val currentTail = tail.get()
+            val nextTail = tail.get().next.get()
+
+            if (nextTail != null) {
+                tail.compareAndSet(currentTail, nextTail)
+                continue
+            }
+
+            val isEmpty = head.get().next.get() == null
+            val mismatch = when (currentTail) {
+                is Dummy -> false
+                is Receiver -> newNode is Sender
+                is Sender -> newNode is Receiver
+            }
+
+            if (!isEmpty && mismatch) {
+                return false
+            }
+
+            if (!currentTail.next.compareAndSet(null, newNode)) {
+                continue
+            }
+
+            tail.compareAndSet(currentTail, newNode)
+            return true
+        }
     }
 
-    private fun tryExtractNode(curHead: Node): Node? {
-        TODO("Implement me!")
-        // TODO: Return a node with the extracted continuation & element.
+    private sealed class Node<E> {
+        val next = AtomicReference<Node<E>?>(null)
     }
 
-    class Node(
-        // Sending element in case of suspended `send()` or
-        // RECEIVER in case of suspended `receive()`.
-        val element: Any?,
-        // Suspended `send` of `receive` request.
-        val continuation: Continuation<Any?>?
-    ) {
-        val next = AtomicReference<Node?>(null)
-    }
+    private class Sender<E>(
+        val element: E?,
+        val dispatched: Continuation<Boolean>
+    ): Node<E>()
+
+    private class Receiver<E>(
+        val received: Continuation<E>
+    ): Node<E>()
+
+    private class Dummy<E> : Node<E>()
 }
-
-private val RECEIVER = "Receiver"
