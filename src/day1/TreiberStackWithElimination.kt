@@ -29,7 +29,11 @@ open class TreiberStackWithElimination<E> : Stack<E> {
             return false
         }
 
-        for (i in 0 until ELIMINATION_WAIT_CYCLES) {}
+        repeat(ELIMINATION_WAIT_CYCLES) {
+            if (eliminationArray.compareAndSet(cell, CELL_STATE_RETRIEVED, CELL_STATE_EMPTY)) {
+                return true
+            }
+        }
 
         val valueAfterWait = eliminationArray.getAndSet(cell, CELL_STATE_EMPTY)
         return valueAfterWait == CELL_STATE_RETRIEVED
@@ -38,23 +42,27 @@ open class TreiberStackWithElimination<E> : Stack<E> {
     override fun pop(): E? = tryPopElimination() ?: stack.pop()
 
     private fun tryPopElimination(): E? {
-//        TODO("Implement me!")
+        //        TODO("Implement me!")
         // TODO: Choose a random cell in `eliminationArray`
         // TODO: and try to retrieve an element from there.
         // TODO: On success, return the element.
         // TODO: Otherwise, if the cell is empty, return `null`.
         val cell = randomCellIndex()
-        val value = eliminationArray.getAndSet(cell, CELL_STATE_RETRIEVED)
-        if (value == CELL_STATE_EMPTY) {
-            return null
-        }
+        while (true) {
+            val cellValue = eliminationArray.get(cell)
+            if (cellValue == CELL_STATE_EMPTY) {
+                return null
+            }
 
-        if (value == CELL_STATE_RETRIEVED) {
-            return null
-        }
+            if (cellValue == CELL_STATE_RETRIEVED) {
+                return null
+            }
 
-        @Suppress("UNCHECKED_CAST")
-        return value as? E?
+            if (eliminationArray.compareAndSet(cell, cellValue, CELL_STATE_RETRIEVED)) {
+                @Suppress("UNCHECKED_CAST")
+                return cellValue as? E?
+            }
+        }
     }
 
     private fun randomCellIndex(): Int =
