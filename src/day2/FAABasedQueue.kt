@@ -7,14 +7,69 @@ import java.util.concurrent.atomic.*
 // TODO: and implement the infinite array on a linked list
 // TODO: of fixed-size `Segment`s.
 class FAABasedQueue<E> : Queue<E> {
+    private val head: AtomicReference<Segment>
+    private val tail: AtomicReference<Segment>
+    private val enqIdx = AtomicLong(0)
+    private val deqIdx = AtomicLong(0)
+
+    init {
+        val dummy = Segment(0)
+        head = AtomicReference(dummy)
+        tail = AtomicReference(dummy)
+    }
+
     override fun enqueue(element: E) {
-        TODO("implement me")
+        while (true) {
+            val globalIndex = enqIdx.getAndIncrement()
+            val segmentId = globalIndex / SEGMENT_SIZE
+
+            var currentTail = tail.get()
+            while (currentTail.id < segmentId) {
+               var next = currentTail.next.get()
+                if (next == null) {
+                    val newSegment = Segment(currentTail.id + 1)
+                    next = if (currentTail.next.compareAndSet(null, newSegment)) {
+                        newSegment
+                    } else {
+                        currentTail.next.get()
+                    }
+                }
+
+                tail.compareAndSet(currentTail, next)
+                currentTail = tail.get()
+            }
+
+            val index = globalIndex % SEGMENT_SIZE
+            if (tail.get().compareAndSet(index.toInt(), null, element)) {
+                break
+            }
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
     override fun dequeue(): E? {
-        TODO("implement me")
+        while (true) {
+            if (isEmpty()) {
+                return null
+            }
+
+            val globalIndex = deqIdx.getAndIncrement()
+            val segmentId = globalIndex / SEGMENT_SIZE
+
+            var currentHead = head.get()
+            while (currentHead.id < segmentId) {
+                currentHead = currentHead.next.get() ?: return null
+            }
+
+            val index = globalIndex % SEGMENT_SIZE
+            val element = currentHead.getAndSet(index.toInt(), POISONED)
+            if (element != null && element != POISONED) {
+                return element as? E?
+            }
+        }
     }
+
+    private fun isEmpty() = deqIdx.get() >= enqIdx.get()
 }
 
 // TODO: Use me to construct a linked list of segments.
