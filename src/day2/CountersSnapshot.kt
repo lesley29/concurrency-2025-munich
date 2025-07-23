@@ -13,6 +13,24 @@ class CountersSnapshot {
 
     fun countersSnapshot(): Triple<Long, Long, Long> {
         // TODO: make me atomic using the double-collect technique.
-        return Triple(counter1.get(), counter2.get(), counter3.get())
+        while (true) {
+            val first = counter1.get()
+            val second = counter2.get()
+            val third = counter3.get()
+
+            if (first != counter1.get()) {
+                continue
+            }
+
+            if (second != counter2.get()) {
+                continue
+            }
+
+            if (third != counter3.get()) {
+                continue
+            }
+
+            return Triple(first, second, third)
+        }
     }
 }
