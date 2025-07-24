@@ -33,7 +33,7 @@ class MSQueueWithLinearTimeNonParallelRemoveTest : TestBase(
     checkObstructionFreedom = true,
     threads = 2,
     actorsBefore = 5,
-    scenarios = 500
+    scenarios = 1500
 ) {
     private val queue = MSQueueWithLinearTimeNonParallelRemove<Int>()
 
