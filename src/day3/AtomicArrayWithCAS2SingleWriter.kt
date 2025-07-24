@@ -18,7 +18,20 @@ class AtomicArrayWithCAS2SingleWriter<E : Any>(size: Int, initialValue: E) {
 
     fun get(index: Int): E {
         // TODO: the cell can store CAS2Descriptor
-        return array[index] as E
+        when (val value = array[index]) {
+            is AtomicArrayWithCAS2SingleWriter<*>.CAS2Descriptor -> {
+                val previousValue = if (value.index1 == index) value.expected1 else value.expected2
+                val newValue = if (value.index1 == index) value.update1 else value.update2
+
+                return when (value.status.get()) {
+                    UNDECIDED, FAILED -> previousValue as E
+                    SUCCESS -> newValue as E
+                }
+            }
+            else -> {
+                return value as E
+            }
+        }
     }
 
     fun cas2(
@@ -45,6 +58,28 @@ class AtomicArrayWithCAS2SingleWriter<E : Any>(size: Int, initialValue: E) {
             // TODO: create functions for each of these three phases.
             // TODO: In this task, only one thread can call cas2(..),
             // TODO: so cas2(..) calls cannot be executed concurrently.
+            if (!array.compareAndSet(index1, expected1, this)) {
+                this.status.set(FAILED)
+            }
+
+            if (!array.compareAndSet(index2, expected2, this)) {
+                this.status.set(FAILED)
+            }
+
+            this.status.compareAndSet(UNDECIDED, SUCCESS)
+
+            when (status.get()) {
+                UNDECIDED, FAILED -> {
+                    // ROLLBACK
+                    array.compareAndSet(index1, this, expected1)
+                    array.compareAndSet(index2, this, expected2)
+                }
+                SUCCESS -> {
+                    // APPLY
+                    array.compareAndSet(index1, this, update1)
+                    array.compareAndSet(index2, this, update2)
+                }
+            }
         }
     }
 
