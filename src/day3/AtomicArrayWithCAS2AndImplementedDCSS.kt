@@ -3,7 +3,8 @@
 package day3
 
 import day3.AtomicArrayWithCAS2AndImplementedDCSS.Status.*
-import java.util.concurrent.atomic.*
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicReferenceArray
 
 // This implementation never stores `null` values.
 class AtomicArrayWithCAS2AndImplementedDCSS<E : Any>(size: Int, initialValue: E) {
@@ -41,18 +42,12 @@ class AtomicArrayWithCAS2AndImplementedDCSS<E : Any>(size: Int, initialValue: E)
     ): Boolean {
         require(index1 != index2) { "The indices should be different" }
 
-        val first = if (index1 < index2) index1 else index2
-        val firstExpected = if (first == index1) expected1 else expected2
-        val firstUpdate = if (first == index1) update1 else update2
+        val descriptor = if (index1 < index2) {
+            CAS2Descriptor(index1, expected1, update1, index2, expected2, update2)
+        } else {
+            CAS2Descriptor(index2, expected2, update2, index1, expected1, update1)
+        }
 
-        val second = if (first == index1) index2 else index1
-        val secondExpected = if (second == index1) expected1 else expected2
-        val secondUpdate = if (second == index1) update1 else update2
-
-        val descriptor = CAS2Descriptor(
-            index1 = first, expected1 = firstExpected, update1 = firstUpdate,
-            index2 = second, expected2 = secondExpected, update2 = secondUpdate
-        )
         descriptor.apply()
         return descriptor.status.get() === SUCCESS
     }
