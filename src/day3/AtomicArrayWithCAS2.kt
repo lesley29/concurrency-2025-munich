@@ -33,18 +33,11 @@ class AtomicArrayWithCAS2<E : Any>(size: Int, initialValue: E) {
         require(index1 != index2) { "The indices should be different" }
         // TODO: this implementation is not linearizable,
         // TODO: Store a CAS2 descriptor in array[index1].
-        val first = if (index1 < index2) index1 else index2
-        val firstExpected = if (first == index1) expected1 else expected2
-        val firstUpdate = if (first == index1) update1 else update2
-
-        val second = if (first == index1) index2 else index1
-        val secondExpected = if (second == index1) expected1 else expected2
-        val secondUpdate = if (second == index1) update1 else update2
-
-        val descriptor = CAS2Descriptor(
-            index1 = first, expected1 = firstExpected, update1 = firstUpdate,
-            index2 = second, expected2 = secondExpected, update2 = secondUpdate
-        )
+        val descriptor = if (index1 < index2) {
+            CAS2Descriptor(index1, expected1, update1, index2, expected2, update2)
+        } else {
+            CAS2Descriptor(index2, expected2, update2, index1, expected1, update1)
+        }
         descriptor.apply()
         return descriptor.status.get() === CasStatus.SUCCESS
     }
@@ -78,6 +71,7 @@ class AtomicArrayWithCAS2<E : Any>(size: Int, initialValue: E) {
                 when (val currentValue = array[index]) {
                     this -> return true
                     is AtomicArrayWithCAS2<*>.CAS2Descriptor -> currentValue.apply()
+                    is AtomicArrayWithCAS2<*>.DcssDescriptor -> currentValue.complete()
                     expected -> {
                         if (dcss(index, currentValue, this, status, CasStatus.UNDECIDED)) {
                             return true
