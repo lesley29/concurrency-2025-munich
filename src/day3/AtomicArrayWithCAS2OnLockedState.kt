@@ -26,49 +26,6 @@ class AtomicArrayWithCAS2OnLockedState<E : Any>(size: Int, initialValue: E) {
         }
     }
 
-//    fun cas2(
-//        index1: Int, expected1: E, update1: E,
-//        index2: Int, expected2: E, update2: E
-//    ): Boolean {
-//        require(index1 != index2) { "The indices should be different" }
-//        // TODO: Make me thread-safe by "locking" the cells
-//        // TODO: via atomically changing their states to LOCKED.
-//        val first = if (index1 < index2) index1 else index2
-//        val firstExpected = if (first == index1) expected1 else expected2
-//        val firstUpdate = if (first == index1) update1 else update2
-//
-//        val second = if (first == index1) index2 else index1
-//        val secondExpected = if (second == index1) expected1 else expected2
-//        val secondUpdate = if (second == index1) update1 else update2
-//
-//        while (true) {
-//            if (array[first] == LOCKED) {
-//                continue
-//            }
-//
-//            if (!array.compareAndSet(first, firstExpected, LOCKED)) {
-//                return false
-//            }
-//
-//            while (true) {
-//                if (array[second] == LOCKED) {
-//                    continue
-//                }
-//
-//                if (!array.compareAndSet(second, secondExpected, LOCKED)) {
-//                    array.compareAndSet(first, LOCKED, firstExpected)
-//                    return false
-//                }
-//
-//                break
-//            }
-//
-//            array.set(first, firstUpdate)
-//            array.set(second, secondUpdate)
-//            return true
-//        }
-//    }
-
     fun cas2(
         index1: Int, expected1: E, update1: E,
         index2: Int, expected2: E, update2: E
