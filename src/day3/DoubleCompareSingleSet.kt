@@ -15,9 +15,15 @@ class DoubleCompareSingleSet<E>(initialCellValue: E) {
     /**
      * Reads the Cell value.
      */
+    @Suppress("UNCHECKED_CAST")
     fun getCell(): E {
         // TODO: 'cell' can store DCSSDescriptor
-        return cell.get() as E
+        while (true) {
+            when (val value = cell.get()) {
+                is DoubleCompareSingleSet<*>.DcssDescriptor -> value.complete()
+                else -> return value as E
+            }
+        }
     }
 
     /**
@@ -32,7 +38,9 @@ class DoubleCompareSingleSet<E>(initialCellValue: E) {
         expectedCas2Status: Cas2Status
     ): Boolean {
         val descriptor = DcssDescriptor(expectedCellState, updateCellState, expectedCas2Status)
-        descriptor.install()
+        if (!descriptor.install()) {
+            return false
+        }
         descriptor.complete()
         return descriptor.status.get() == DCSSStatus.SUCCESS
     }
@@ -40,7 +48,7 @@ class DoubleCompareSingleSet<E>(initialCellValue: E) {
     private inner class DcssDescriptor(
         val expectedCellState: E,
         val updateCellState: E,
-        val expectedStatus: Cas2Status
+        val expectedCas2Status: Cas2Status
     ) {
         val status = AtomicReference(DCSSStatus.UNDECIDED)
 
@@ -49,13 +57,47 @@ class DoubleCompareSingleSet<E>(initialCellValue: E) {
             // TODO: returning `true` on success
             // TODO: or `false` if the value is not the expected one.
             // TODO: Importantly, other threads should not help install the descriptor!
-            TODO("Implement me!")
+            while (true) {
+                when (val value = cell.get()) {
+                    this -> return true
+                    is DoubleCompareSingleSet<*>.DcssDescriptor -> value.complete()
+                    expectedCellState -> {
+                        if (cell.compareAndSet(value, this)) {
+                            return true
+                        }
+                    }
+                    else -> return false
+                }
+            }
         }
 
         // Other operations can call this function for helping.
         fun complete() {
             // TODO: (1) Apply logically: check whether 'b' == expectedB and update the status
             // TODO: (2) Apply physically: update 'a'
+
+            while (true) {
+                when (status.get()) {
+                    DCSSStatus.SUCCESS -> {
+                        cell.compareAndSet(this, updateCellState)
+                        return
+                    }
+                    DCSSStatus.FAILED -> {
+                        cell.compareAndSet(this, expectedCellState)
+                        return
+                    }
+                    else -> {}
+                }
+
+                when (cas2status.get()) {
+                    expectedCas2Status -> {
+                        status.compareAndSet(DCSSStatus.UNDECIDED, DCSSStatus.SUCCESS)
+                    }
+                    else -> {
+                        status.compareAndSet(DCSSStatus.UNDECIDED, DCSSStatus.FAILED)
+                    }
+                }
+            }
         }
     }
 
