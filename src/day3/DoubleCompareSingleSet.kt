@@ -75,7 +75,6 @@ class DoubleCompareSingleSet<E>(initialCellValue: E) {
         fun complete() {
             // TODO: (1) Apply logically: check whether 'b' == expectedB and update the status
             // TODO: (2) Apply physically: update 'a'
-
             while (true) {
                 when (status.get()) {
                     DCSSStatus.SUCCESS -> {
@@ -86,15 +85,12 @@ class DoubleCompareSingleSet<E>(initialCellValue: E) {
                         cell.compareAndSet(this, expectedCellState)
                         return
                     }
-                    else -> {}
-                }
-
-                when (cas2status.get()) {
-                    expectedCas2Status -> {
-                        status.compareAndSet(DCSSStatus.UNDECIDED, DCSSStatus.SUCCESS)
-                    }
-                    else -> {
-                        status.compareAndSet(DCSSStatus.UNDECIDED, DCSSStatus.FAILED)
+                    DCSSStatus.UNDECIDED -> {
+                        if (cas2status.get() == expectedCas2Status) {
+                            status.compareAndSet(DCSSStatus.UNDECIDED, DCSSStatus.SUCCESS)
+                        } else {
+                            status.compareAndSet(DCSSStatus.UNDECIDED, DCSSStatus.FAILED)
+                        }
                     }
                 }
             }
