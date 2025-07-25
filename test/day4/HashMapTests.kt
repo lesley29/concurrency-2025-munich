@@ -21,7 +21,7 @@ class SingleWriterHashTableTest : TestBase(
 
 class ConcurrentHashTableWithoutResizeTest : TestBase(
     sequentialSpecification = SequentialHashTableIntInt::class,
-    scenarios = 300
+    scenarios = 500
 ) {
     private val hashTable = ConcurrentHashTableWithoutResize<Int, Int>(initialCapacity = 30)
 
