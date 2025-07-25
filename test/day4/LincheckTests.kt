@@ -2,7 +2,10 @@ package day4
 
 import day1.*
 import org.jetbrains.lincheck.Lincheck
+import org.jetbrains.lincheck.datastructures.ModelCheckingOptions
+import org.jetbrains.lincheck.datastructures.Operation
 import org.junit.*
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.*
 import kotlin.concurrent.*
 
@@ -108,4 +111,27 @@ class FlatCombiningQueueWithTrickyBugTest {
          https://kotlinlang.org/docs/introduction.html#next-step
  */
 class ConcurrentLinkedDequeTest {
+    private val deque = ConcurrentLinkedDeque<Int>()
+
+    @Operation
+    fun addFirst(e: Int) = deque.addFirst(e)
+
+    @Operation
+    fun addLast(e: Int) = deque.addLast(e)
+
+    @Operation
+    fun pollFirst() = deque.pollFirst()
+
+    @Operation
+    fun pollLast() = deque.pollLast()
+
+    @Operation
+    fun peekFirst() = deque.peekFirst()
+
+    @Operation
+    fun peekLast() = deque.peekLast()
+
+    @Test
+    fun modelCheckingTest() = ModelCheckingOptions()
+        .check(this::class)
 }
