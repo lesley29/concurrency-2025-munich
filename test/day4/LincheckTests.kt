@@ -64,18 +64,22 @@ class FlatCombiningQueueWithTrickyBugTest {
             }
         }
         runParallelQueueOperations(q)
-        check(lockReleases.get() <= THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
+        check(lockReleases.get() <= 2 * THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
             "At least one operation acquired the lock twice"
         }
-        check(lockReleases.get() < THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
+        // This check isn’t quite right—if all operations from all threads run one after the other,
+        // then lockReleases.get() will be exactly 2 * THREADS * ENQ_DEQ_PAIRS_PER_THREAD.
+        // Ideally, we should test that behavior separately in another test
+        check(lockReleases.get() < 2 * THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
             "The combiner does not help other threads"
         }
         lockReleases.set(0)
         runParallelQueueOperations(q)
-        check(lockReleases.get() <= THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
+        check(lockReleases.get() <= 2 * THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
             "At least one operation acquired the lock twice"
         }
-        check(lockReleases.get() < THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
+        // Same comment as before
+        check(lockReleases.get() < 2 * THREADS * ENQ_DEQ_PAIRS_PER_THREAD) {
             "The combiner helped other threads during the first execution, " + "but did not help during the second one. " + "Probably, you clean the array slots incorrectly."
         }
     }
